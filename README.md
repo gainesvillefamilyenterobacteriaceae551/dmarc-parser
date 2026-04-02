@@ -1,5 +1,7 @@
 # DMARC Report Analyser
 
+![DMARC Report Analyser](public/DMARC-PARSER.png)
+
 A browser-only tool for inspecting DMARC aggregate (rua) XML reports. No backend, no data leaves your machine.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
