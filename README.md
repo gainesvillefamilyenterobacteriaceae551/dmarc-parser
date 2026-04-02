@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DMARC Report Analyser
 
-## Getting Started
+A browser-only tool for inspecting DMARC aggregate (rua) XML reports. No backend, no data leaves your machine.
 
-First, run the development server:
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss)
+![Zero backend](https://img.shields.io/badge/backend-none-green)
+
+## Features
+
+- **Upload** — drag-and-drop or pick multiple `.xml` and `.zip` files at once; ZIPs are decompressed in-browser (no server)
+- **Summary dashboard** — total messages, pass rate with progress bar, date range, unique IPs, reporter count
+- **Sending infrastructure detection** — infers sender from DKIM selectors (Google Workspace, Amazon SES, Resend, Brevo, Postmark, Mailgun, HubSpot, and more)
+- **Records table** — sortable by any column, filterable by result / reporter / free-text search, paginated
+- **Row colour-coding** — green for full pass, yellow for partial, red for any failure or non-`none` disposition
+- **Failure detail panel** — full `auth_results` breakdown per failing record including DKIM selector, SPF scope, and applied policy
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS v4 |
+| ZIP decompression | Native `DecompressionStream` API |
+| XML parsing | Native `DOMParser` |
+| Dependencies | None beyond Next.js |
 
-## Learn More
+## Project structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+├── app/                        # Next.js App Router
+├── components/
+│   ├── ui/                     # DropZone, StatCard, Badge, Toast
+│   └── features/               # Analyser, SummaryDashboard, RecordsTable, FailurePanel
+└── lib/
+    ├── parse.ts                # XML parser + provider/infra detection
+    ├── zip.ts                  # In-browser ZIP reader
+    └── types.ts                # Shared TypeScript types
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Privacy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+All parsing happens in the browser. No XML content, IP addresses, or report data is ever sent to a server.
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT

@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DMARC Report Analyser</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim: #484f58;
+    --green: #2ea043;
+    --green-bg: #0f2a1a;
+    --green-text: #3fb950;
+    --yellow: #d29922;
+    --yellow-bg: #2a1f0a;
+    --yellow-text: #e3b341;
+    --red: #da3633;
+    --red-bg: #2a0e0e;
+    --red-text: #f85149;
+    --blue: #1f6feb;
+    --blue-text: #58a6ff;
+    --accent: #238636;
+    --radius: 6px;
+    --font: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+  }
+
+  header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  header .subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font);
+    letter-spacing: 0.02em;
+  }
+
+  .badge-green  { background: var(--green-bg);  color: var(--green-text);  border: 1px solid #2ea04340; }
+  .badge-yellow { background: var(--yellow-bg); color: var(--yellow-text); border: 1px solid #d2992240; }
+  .badge-red    { background: var(--red-bg);    color: var(--red-text);    border: 1px solid #da363340; }
+  .badge-muted  { background: var(--surface2);  color: var(--text-muted);  border: 1px solid var(--border); }
+  .badge-blue   { background: #0d1f38;          color: var(--blue-text);   border: 1px solid #1f6feb40; }
+
+  main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+  /* Drop zone */
+  #drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--surface);
+    margin-bottom: 24px;
+  }
+
+  #drop-zone:hover, #drop-zone.drag-over {
+    border-color: var(--blue);
+    background: #0d1f38;
+  }
+
+  #drop-zone .drop-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.6;
+  }
+
+  #drop-zone p { color: var(--text-muted); margin: 4px 0; }
+  #drop-zone p strong { color: var(--text); }
+
+  #file-input { display: none; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    transition: background 0.1s, border-color 0.1s;
+    font-family: var(--sans);
+  }
+
+  .btn:hover { background: #30363d; border-color: #484f58; }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: #2ea043;
+    color: #fff;
+  }
+
+  .btn-primary:hover { background: #2ea043; }
+
+  .btn-danger {
+    background: var(--red-bg);
+    border-color: var(--red);
+    color: var(--red-text);
+  }
+
+  .btn-danger:hover { background: #3d1212; }
+
+  /* File list */
+  #file-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font);
+  }
+
+  .file-chip .remove {
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1;
+    transition: color 0.1s;
+  }
+
+  .file-chip .remove:hover { color: var(--red-text); }
+
+  /* Actions bar */
+  #actions-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    align-items: center;
+  }
+
+  #actions-bar .file-count {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-family: var(--font);
+  }
+
+  /* Summary cards */
+  #summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+
+  .stat-card .label {
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  .stat-card .value {
+    font-size: 28px;
+    font-weight: 700;
+    font-family: var(--font);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-card .sub {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .stat-card.pass .value  { color: var(--green-text); }
+  .stat-card.fail .value  { color: var(--red-text); }
+  .stat-card.warn .value  { color: var(--yellow-text); }
+  .stat-card.info .value  { color: var(--blue-text); }
+
+  /* Infrastructure tags */
+  #infra-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+
+  #infra-section h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  #infra-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  /* Progress bar */
+  .pass-bar {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .pass-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--green);
+    transition: width 0.4s ease;
+  }
+
+  /* Section headers */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .section-header h2 {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* Table */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 24px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead { background: var(--surface); position: sticky; top: 0; z-index: 1; }
+
+  th {
+    padding: 10px 12px;
+    text-align: left;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.1s;
+  }
+
+  th:hover { color: var(--text); }
+
+  th.sort-asc::after  { content: ' ↑'; color: var(--blue-text); }
+  th.sort-desc::after { content: ' ↓'; color: var(--blue-text); }
+
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tr.row-pass   { background: transparent; }
+  tr.row-partial { background: #1a1500; }
+  tr.row-fail   { background: #1a0a0a; }
+
+  tr.row-pass:hover   { background: #0f2a1a33; }
+  tr.row-partial:hover { background: #2a1f0a66; }
+  tr.row-fail:hover   { background: #2a0e0e66; }
+
+  td.ip {
+    font-family: var(--font);
+    font-size: 12px;
+    color: var(--blue-text);
+  }
+
+  td.count {
+    font-family: var(--font);
+    font-weight: 600;
+  }
+
+  td.selector-cell {
+    font-family: var(--font);
+    font-size: 11px;
+    color: var(--text-muted);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Failure panel */
+  #failure-section {
+    margin-bottom: 24px;
+  }
+
+  .failure-card {
+    background: var(--surface);
+    border: 1px solid var(--red);
+    border-left: 3px solid var(--red);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+
+  .failure-card .failure-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .failure-card .auth-results {
+    background: var(--surface2);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-family: var(--font);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  .auth-results .ar-row { display: flex; gap: 8px; align-items: baseline; }
+  .auth-results .ar-key { color: var(--text-muted); min-width: 80px; }
+  .auth-results .ar-val { color: var(--text); }
+  .auth-results .ar-val.pass { color: var(--green-text); }
+  .auth-results .ar-val.fail { color: var(--red-text); }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 48px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  /* Search + filter bar */
+  #filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  input[type="search"], select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: var(--sans);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input[type="search"] { width: 220px; }
+
+  input[type="search"]:focus, select:focus {
+    border-color: var(--blue);
+  }
+
+  select option { background: var(--surface2); }
+
+  /* Pagination */
+  #pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  #pagination span {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-family: var(--font);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+  /* Hidden */
+  .hidden { display: none !important; }
+
+  /* Spinner */
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--blue-text);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--text);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    z-index: 100;
+    transition: opacity 0.3s;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #toast.show { opacity: 1; }
+  #toast.error { border-color: var(--red); color: var(--red-text); }
+  #toast.success { border-color: var(--green); color: var(--green-text); }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+    <rect x="1" y="1" width="18" height="18" rx="3" stroke="#58a6ff" stroke-width="1.5"/>
+    <path d="M4 7l6 4 6-4" stroke="#58a6ff" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M4 11h12M4 14h8" stroke="#58a6ff" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  </svg>
+  <h1>DMARC Report Analyser</h1>
+  <span class="subtitle">— aggregate report inspector</span>
+</header>
+
+<main>
+  <!-- Drop zone -->
+  <div id="drop-zone">
+    <div class="drop-icon">📨</div>
+    <p><strong>Drop DMARC XML or ZIP files here</strong></p>
+    <p style="margin: 8px 0 16px;">or</p>
+    <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+      Browse files
+    </button>
+    <input type="file" id="file-input" multiple accept=".xml,.zip">
+    <p style="margin-top:16px; font-size:12px;">Supports multiple .xml and .zip files simultaneously</p>
+  </div>
+
+  <!-- File list -->
+  <div id="file-list"></div>
+
+  <!-- Actions -->
+  <div id="actions-bar" class="hidden">
+    <button class="btn btn-primary" id="parse-btn">
+      <span id="parse-spinner" class="spinner hidden"></span>
+      Analyse reports
+    </button>
+    <button class="btn btn-danger" id="clear-btn">Clear all</button>
+    <span class="file-count" id="file-count-label"></span>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="hidden">
+
+    <!-- Summary cards -->
+    <div id="summary">
+      <div class="stat-card info">
+        <div class="label">Total Messages</div>
+        <div class="value" id="stat-total">0</div>
+        <div class="sub" id="stat-reports">0 reports</div>
+      </div>
+      <div class="stat-card pass" id="pass-card">
+        <div class="label">Pass Rate</div>
+        <div class="value" id="stat-passrate">0%</div>
+        <div class="sub" id="stat-pass-count"></div>
+        <div class="pass-bar"><div class="pass-bar-fill" id="pass-bar-fill" style="width:0%"></div></div>
+      </div>
+      <div class="stat-card info">
+        <div class="label">Date Range</div>
+        <div class="value" style="font-size:16px" id="stat-daterange">—</div>
+        <div class="sub" id="stat-datedays"></div>
+      </div>
+      <div class="stat-card info">
+        <div class="label">Unique IPs</div>
+        <div class="value" id="stat-ips">0</div>
+        <div class="sub">source addresses</div>
+      </div>
+      <div class="stat-card info">
+        <div class="label">Reporters</div>
+        <div class="value" id="stat-reporters">0</div>
+        <div class="sub">organisations</div>
+      </div>
+    </div>
+
+    <!-- Infrastructure -->
+    <div id="infra-section">
+      <h3>Detected sending infrastructure</h3>
+      <div id="infra-tags"></div>
+    </div>
+
+    <!-- Records table -->
+    <div class="section-header">
+      <h2>Records</h2>
+      <div id="filter-bar">
+        <input type="search" id="search-input" placeholder="Search IP, selector, sender…">
+        <select id="filter-result">
+          <option value="">All results</option>
+          <option value="pass">Pass</option>
+          <option value="partial">Partial</option>
+          <option value="fail">Fail</option>
+        </select>
+        <select id="filter-reporter">
+          <option value="">All reporters</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="records-table">
+        <thead>
+          <tr>
+            <th data-col="date">Date</th>
+            <th data-col="reporter">Reporter</th>
+            <th data-col="ip">Source IP</th>
+            <th data-col="count">Count</th>
+            <th data-col="dkim">DKIM</th>
+            <th data-col="spf">SPF</th>
+            <th data-col="disposition">Disposition</th>
+            <th data-col="selectors">Selector(s)</th>
+            <th data-col="sender">Inferred Sender</th>
+          </tr>
+        </thead>
+        <tbody id="records-body"></tbody>
+      </table>
+    </div>
+
+    <div id="pagination"></div>
+
+    <!-- Failure detail -->
+    <div id="failure-section" class="hidden">
+      <div class="section-header">
+        <h2 style="color: var(--red-text)">⚠ Failure Details</h2>
+      </div>
+      <div id="failure-list"></div>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ─── DMARC Provider detection ───────────────────────────────────────────────
+const PROVIDERS = [
+  { match: /google/i,     name: 'Google',             color: '#4285f4' },
+  { match: /microsoft|outlook|hotmail|office 365/i, name: 'Microsoft', color: '#00a4ef' },
+  { match: /yahoo/i,      name: 'Yahoo',              color: '#720e9e' },
+  { match: /amazon|aws|ses/i, name: 'Amazon SES',     color: '#ff9900' },
+  { match: /mailchimp/i,  name: 'Mailchimp',          color: '#ffe01b' },
+  { match: /sendgrid/i,   name: 'SendGrid',           color: '#1a82e2' },
+  { match: /proofpoint/i, name: 'Proofpoint',         color: '#e86c00' },
+  { match: /mimecast/i,   name: 'Mimecast',           color: '#00a3e0' },
+];
+
+// Infer sending infrastructure from DKIM selectors
+const SELECTOR_INFRA = [
+  { match: /^google|^gapps|gmail/i,        name: 'Google Workspace' },
+  { match: /^selector\d+\.google|^20\d{6}\.google/i, name: 'Google Workspace' },
+  { match: /^s\d+\.domainkey.*amazon|^amazonses/i, name: 'Amazon SES' },
+  { match: /resend/i,                       name: 'Resend' },
+  { match: /sendgrid/i,                     name: 'SendGrid' },
+  { match: /mailchimp|mandrill/i,           name: 'Mailchimp/Mandrill' },
+  { match: /hostinger/i,                    name: 'Hostinger' },
+  { match: /brevo|sendinblue/i,             name: 'Brevo' },
+  { match: /postmark/i,                     name: 'Postmark' },
+  { match: /sparkpost|messagebird/i,        name: 'SparkPost' },
+  { match: /mailgun/i,                      name: 'Mailgun' },
+  { match: /klaviyo/i,                      name: 'Klaviyo' },
+  { match: /hubspot/i,                      name: 'HubSpot' },
+  { match: /salesforce|exacttarget/i,       name: 'Salesforce' },
+  { match: /zendesk/i,                      name: 'Zendesk' },
+  { match: /zoho/i,                         name: 'Zoho' },
+  { match: /protonmail/i,                   name: 'ProtonMail' },
+  { match: /fastmail/i,                     name: 'Fastmail' },
+  { match: /outlook|microsoft|office365/i,  name: 'Microsoft 365' },
+  { match: /yahoo/i,                        name: 'Yahoo Mail' },
+];
+
+function inferSenderFromSelector(selectors) {
+  if (!selectors || selectors.length === 0) return '—';
+  const joined = selectors.join(' ');
+  for (const rule of SELECTOR_INFRA) {
+    if (rule.match.test(joined)) return rule.name;
+  }
+  return selectors[0] ? selectors[0].split(/[._-]/)[0] : '—';
+}
+
+function detectProvider(orgName) {
+  if (!orgName) return orgName || 'Unknown';
+  for (const p of PROVIDERS) {
+    if (p.match.test(orgName)) return p.name;
+  }
+  return orgName;
+}
+
+function tsToDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(parseInt(ts, 10) * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+// ─── XML Parsing ─────────────────────────────────────────────────────────────
+function parseXML(xmlStr, filename) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlStr, 'application/xml');
+  const err = doc.querySelector('parsererror');
+  if (err) throw new Error(`XML parse error in ${filename}`);
+
+  const get = (parent, tag) => parent?.querySelector(tag)?.textContent?.trim() || '';
+
+  const meta = doc.querySelector('report_metadata') || doc.querySelector('feedback > report_metadata');
+  const policy = doc.querySelector('policy_published');
+
+  const orgName  = get(meta, 'org_name');
+  const dateBegin = get(meta, 'date_range > begin') || get(meta, 'begin');
+  const dateEnd   = get(meta, 'date_range > end')   || get(meta, 'end');
+
+  const records = [];
+  doc.querySelectorAll('record').forEach(rec => {
+    const row = rec.querySelector('row');
+    const ip  = get(row, 'source_ip');
+    const count = parseInt(get(row, 'count'), 10) || 0;
+    const disp  = get(row, 'policy_evaluated > disposition');
+    const dkim  = get(row, 'policy_evaluated > dkim');
+    const spf   = get(row, 'policy_evaluated > spf');
+
+    // Auth results — may have multiple dkim entries
+    const authResults = rec.querySelector('auth_results');
+    const dkimResults = [];
+    authResults?.querySelectorAll('dkim').forEach(d => {
+      dkimResults.push({
+        domain:   get(d, 'domain'),
+        selector: get(d, 'selector'),
+        result:   get(d, 'result'),
+      });
+    });
+
+    const spfResults = [];
+    authResults?.querySelectorAll('spf').forEach(s => {
+      spfResults.push({
+        domain: get(s, 'domain'),
+        result: get(s, 'result'),
+        scope:  get(s, 'scope'),
+      });
+    });
+
+    const selectors = dkimResults.map(d => d.selector).filter(Boolean);
+    const sender    = inferSenderFromSelector(selectors);
+
+    records.push({
+      reporter:  detectProvider(orgName),
+      dateBegin: tsToDate(dateBegin),
+      dateEnd:   tsToDate(dateEnd),
+      ip,
+      count,
+      dkim,
+      spf,
+      disposition: disp || 'none',
+      selectors,
+      sender,
+      dkimResults,
+      spfResults,
+      policyDomain: get(policy, 'domain'),
+      policyDkim:   get(policy, 'adkim'),
+      policySpf:    get(policy, 'aspf'),
+      policyP:      get(policy, 'p'),
+    });
+  });
+
+  return { orgName: detectProvider(orgName), dateBegin, dateEnd, records };
+}
+
+// ─── ZIP handling ────────────────────────────────────────────────────────────
+async function readZip(arrayBuffer) {
+  // Minimal ZIP reader (no external lib)
+  const bytes = new Uint8Array(arrayBuffer);
+  const files = [];
+
+  let i = 0;
+  while (i < bytes.length - 4) {
+    // Local file header signature
+    if (bytes[i]===0x50 && bytes[i+1]===0x4B && bytes[i+2]===0x03 && bytes[i+3]===0x04) {
+      const compression   = bytes[i+8]  | (bytes[i+9]  << 8);
+      const compSize      = bytes[i+18] | (bytes[i+19] << 8) | (bytes[i+20] << 16) | (bytes[i+21] << 24);
+      const uncompSize    = bytes[i+22] | (bytes[i+23] << 8) | (bytes[i+24] << 16) | (bytes[i+25] << 24);
+      const nameLen       = bytes[i+26] | (bytes[i+27] << 8);
+      const extraLen      = bytes[i+28] | (bytes[i+29] << 8);
+      const nameBytes     = bytes.slice(i+30, i+30+nameLen);
+      const name          = new TextDecoder().decode(nameBytes);
+      const dataStart     = i + 30 + nameLen + extraLen;
+
+      if (name.toLowerCase().endsWith('.xml') && !name.startsWith('__MACOSX')) {
+        if (compression === 0) {
+          // Stored (no compression)
+          const xmlBytes = bytes.slice(dataStart, dataStart + uncompSize);
+          files.push({ name, content: new TextDecoder().decode(xmlBytes) });
+        } else if (compression === 8) {
+          // Deflate
+          const compData = bytes.slice(dataStart, dataStart + compSize);
+          try {
+            const ds = new DecompressionStream('deflate-raw');
+            const writer = ds.writable.getWriter();
+            const reader = ds.readable.getReader();
+            writer.write(compData);
+            writer.close();
+            const chunks = [];
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+            }
+            const total = chunks.reduce((n, c) => n + c.length, 0);
+            const merged = new Uint8Array(total);
+            let off = 0;
+            for (const c of chunks) { merged.set(c, off); off += c.length; }
+            files.push({ name, content: new TextDecoder().decode(merged) });
+          } catch(e) {
+            console.warn('Could not decompress', name, e);
+          }
+        }
+      }
+      i = dataStart + compSize;
+    } else {
+      i++;
+    }
+  }
+  return files;
+}
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let pendingFiles = []; // { name, data: ArrayBuffer | string, type }
+let allRecords   = [];
+let sortCol      = 'date';
+let sortDir      = 'desc';
+let currentPage  = 1;
+const PAGE_SIZE  = 50;
+
+// ─── UI Helpers ──────────────────────────────────────────────────────────────
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+function renderFileList() {
+  const list = document.getElementById('file-list');
+  const bar  = document.getElementById('actions-bar');
+  const label = document.getElementById('file-count-label');
+
+  list.innerHTML = '';
+  pendingFiles.forEach((f, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'file-chip';
+    chip.innerHTML = `${f.name} <span class="remove" data-idx="${idx}" title="Remove">✕</span>`;
+    list.appendChild(chip);
+  });
+
+  list.querySelectorAll('.remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingFiles.splice(parseInt(btn.dataset.idx), 1);
+      renderFileList();
+    });
+  });
+
+  const hasFiles = pendingFiles.length > 0;
+  bar.classList.toggle('hidden', !hasFiles);
+  label.textContent = `${pendingFiles.length} file${pendingFiles.length !== 1 ? 's' : ''} queued`;
+}
+
+// ─── File ingestion ───────────────────────────────────────────────────────────
+async function ingestFiles(fileList) {
+  for (const file of fileList) {
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.xml')) {
+      const text = await file.text();
+      if (!pendingFiles.find(f => f.name === file.name)) {
+        pendingFiles.push({ name: file.name, content: text, type: 'xml' });
+      }
+    } else if (name.endsWith('.zip')) {
+      const buf = await file.arrayBuffer();
+      const xmlFiles = await readZip(buf);
+      xmlFiles.forEach(xf => {
+        if (!pendingFiles.find(f => f.name === xf.name)) {
+          pendingFiles.push({ name: xf.name, content: xf.content, type: 'xml' });
+        }
+      });
+    }
+  }
+  renderFileList();
+}
+
+// ─── Parse & analyse ─────────────────────────────────────────────────────────
+async function parseAll() {
+  const btn = document.getElementById('parse-btn');
+  const spinner = document.getElementById('parse-spinner');
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+
+  allRecords = [];
+  const errors = [];
+
+  await new Promise(resolve => setTimeout(resolve, 10)); // let spinner render
+
+  for (const f of pendingFiles) {
+    try {
+      const result = parseXML(f.content, f.name);
+      allRecords.push(...result.records);
+    } catch(e) {
+      errors.push(f.name + ': ' + e.message);
+    }
+  }
+
+  btn.disabled = false;
+  spinner.classList.add('hidden');
+
+  if (errors.length) {
+    toast('Errors: ' + errors.join('; '), 'error');
+  }
+
+  if (allRecords.length === 0) {
+    toast('No records found', 'error');
+    return;
+  }
+
+  toast(`Loaded ${allRecords.length} record${allRecords.length !== 1 ? 's' : ''}`, 'success');
+  renderDashboard();
+}
+
+// ─── Dashboard rendering ──────────────────────────────────────────────────────
+function rowStatus(rec) {
+  const dkimPass = rec.dkim === 'pass';
+  const spfPass  = rec.spf  === 'pass';
+  const dispOk   = rec.disposition === 'none';
+  if (dkimPass && spfPass && dispOk) return 'pass';
+  if (!dkimPass && !spfPass) return 'fail';
+  if (!dispOk) return 'fail';
+  return 'partial';
+}
+
+function renderDashboard() {
+  document.getElementById('dashboard').classList.remove('hidden');
+
+  const total      = allRecords.reduce((s, r) => s + r.count, 0);
+  const passCount  = allRecords.filter(r => rowStatus(r) === 'pass').reduce((s, r) => s + r.count, 0);
+  const passRate   = total > 0 ? Math.round(passCount / total * 100) : 0;
+
+  const uniqueIPs  = new Set(allRecords.map(r => r.ip)).size;
+  const reporters  = new Set(allRecords.map(r => r.reporter));
+
+  // Date range
+  const dates = allRecords.flatMap(r => [r.dateBegin, r.dateEnd]).filter(d => d && d !== '—').sort();
+  const dateMin = dates[0] || '—';
+  const dateMax = dates[dates.length - 1] || '—';
+  let daysDiff = '—';
+  if (dateMin !== '—' && dateMax !== '—') {
+    const d = (new Date(dateMax) - new Date(dateMin)) / 86400000;
+    daysDiff = d === 0 ? 'same day' : `${Math.round(d) + 1} days`;
+  }
+
+  document.getElementById('stat-total').textContent    = total.toLocaleString();
+  document.getElementById('stat-reports').textContent  = `${pendingFiles.length} report file${pendingFiles.length !== 1 ? 's' : ''}`;
+  document.getElementById('stat-passrate').textContent = passRate + '%';
+  document.getElementById('stat-pass-count').textContent = `${passCount.toLocaleString()} / ${total.toLocaleString()} messages`;
+  document.getElementById('pass-bar-fill').style.width  = passRate + '%';
+
+  const passCard = document.getElementById('pass-card');
+  passCard.classList.remove('pass', 'warn', 'fail');
+  passCard.classList.add(passRate >= 95 ? 'pass' : passRate >= 70 ? 'warn' : 'fail');
+
+  document.getElementById('stat-daterange').textContent  = dateMin === dateMax ? dateMin : `${dateMin} → ${dateMax}`;
+  document.getElementById('stat-datedays').textContent   = daysDiff;
+  document.getElementById('stat-ips').textContent        = uniqueIPs;
+  document.getElementById('stat-reporters').textContent  = reporters.size;
+
+  // Infrastructure
+  const infraMap = new Map();
+  allRecords.forEach(r => {
+    const key = r.sender;
+    if (key && key !== '—') {
+      infraMap.set(key, (infraMap.get(key) || 0) + r.count);
+    }
+  });
+
+  const infraTags = document.getElementById('infra-tags');
+  infraTags.innerHTML = '';
+  if (infraMap.size === 0) {
+    infraTags.innerHTML = '<span style="color:var(--text-dim);font-size:12px">No selectors found</span>';
+  } else {
+    [...infraMap.entries()].sort((a, b) => b[1] - a[1]).forEach(([name, count]) => {
+      const tag = document.createElement('span');
+      tag.className = 'badge badge-blue';
+      tag.style.fontSize = '12px';
+      tag.textContent = `${name}  ${count.toLocaleString()}`;
+      infraTags.appendChild(tag);
+    });
+  }
+
+  // Populate reporter filter
+  const repSelect = document.getElementById('filter-reporter');
+  repSelect.innerHTML = '<option value="">All reporters</option>';
+  [...reporters].sort().forEach(r => {
+    const o = document.createElement('option');
+    o.value = r; o.textContent = r;
+    repSelect.appendChild(o);
+  });
+
+  currentPage = 1;
+  renderTable();
+  renderFailures();
+}
+
+// ─── Table ────────────────────────────────────────────────────────────────────
+function getFilteredSorted() {
+  const search   = document.getElementById('search-input').value.toLowerCase();
+  const resFilter = document.getElementById('filter-result').value;
+  const repFilter = document.getElementById('filter-reporter').value;
+
+  return allRecords
+    .filter(r => {
+      if (resFilter && rowStatus(r) !== resFilter) return false;
+      if (repFilter && r.reporter !== repFilter) return false;
+      if (search) {
+        const haystack = [r.ip, r.reporter, r.sender, ...r.selectors, r.disposition].join(' ').toLowerCase();
+        if (!haystack.includes(search)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      let va, vb;
+      switch (sortCol) {
+        case 'date':        va = a.dateBegin; vb = b.dateBegin; break;
+        case 'reporter':    va = a.reporter;  vb = b.reporter;  break;
+        case 'ip':          va = a.ip;        vb = b.ip;        break;
+        case 'count':       va = a.count;     vb = b.count;     break;
+        case 'dkim':        va = a.dkim;      vb = b.dkim;      break;
+        case 'spf':         va = a.spf;       vb = b.spf;       break;
+        case 'disposition': va = a.disposition; vb = b.disposition; break;
+        case 'sender':      va = a.sender;    vb = b.sender;    break;
+        default:            va = a.dateBegin; vb = b.dateBegin;
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 :  1;
+      if (va > vb) return sortDir === 'asc' ?  1 : -1;
+      return 0;
+    });
+}
+
+function statusBadge(val, type = 'auth') {
+  if (!val) return '<span class="badge badge-muted">—</span>';
+  const cls = val === 'pass' ? 'badge-green' : val === 'fail' ? 'badge-red' : 'badge-yellow';
+  return `<span class="badge ${cls}">${val}</span>`;
+}
+
+function dispositionBadge(val) {
+  if (!val || val === 'none') return '<span class="badge badge-muted">none</span>';
+  if (val === 'quarantine')   return `<span class="badge badge-yellow">${val}</span>`;
+  return `<span class="badge badge-red">${val}</span>`;
+}
+
+function renderTable() {
+  const records = getFilteredSorted();
+  const tbody   = document.getElementById('records-body');
+  const pagDiv  = document.getElementById('pagination');
+
+  const totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const slice = records.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  tbody.innerHTML = '';
+
+  if (slice.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state">No records match the current filters.</td></tr>`;
+  } else {
+    slice.forEach(rec => {
+      const status = rowStatus(rec);
+      const tr = document.createElement('tr');
+      tr.className = `row-${status}`;
+      tr.innerHTML = `
+        <td>${rec.dateBegin}</td>
+        <td>${rec.reporter}</td>
+        <td class="ip">${rec.ip}</td>
+        <td class="count">${rec.count.toLocaleString()}</td>
+        <td>${statusBadge(rec.dkim)}</td>
+        <td>${statusBadge(rec.spf)}</td>
+        <td>${dispositionBadge(rec.disposition)}</td>
+        <td class="selector-cell" title="${rec.selectors.join(', ')}">${rec.selectors.join(', ') || '—'}</td>
+        <td>${rec.sender}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Sort indicators
+  document.querySelectorAll('#records-table th').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.col === sortCol) th.classList.add(`sort-${sortDir}`);
+  });
+
+  // Pagination
+  pagDiv.innerHTML = '';
+  if (totalPages > 1) {
+    pagDiv.innerHTML = `
+      <button class="btn" id="pg-prev" ${currentPage === 1 ? 'disabled' : ''}>← Prev</button>
+      <span>Page ${currentPage} / ${totalPages} &nbsp;·&nbsp; ${records.length} records</span>
+      <button class="btn" id="pg-next" ${currentPage === totalPages ? 'disabled' : ''}>Next →</button>
+    `;
+    document.getElementById('pg-prev').addEventListener('click', () => { currentPage--; renderTable(); });
+    document.getElementById('pg-next').addEventListener('click', () => { currentPage++; renderTable(); });
+  }
+}
+
+function renderFailures() {
+  const failures = allRecords.filter(r => rowStatus(r) !== 'pass');
+  const section  = document.getElementById('failure-section');
+  const list     = document.getElementById('failure-list');
+
+  if (failures.length === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+
+  section.classList.remove('hidden');
+  list.innerHTML = '';
+
+  failures.sort((a, b) => b.count - a.count).forEach(rec => {
+    const card = document.createElement('div');
+    card.className = 'failure-card';
+
+    const dkimRows = rec.dkimResults.map(d =>
+      `<div class="ar-row">
+        <span class="ar-key">dkim</span>
+        <span class="ar-val ${d.result}">${d.domain} · selector: ${d.selector || '—'} · <strong>${d.result || '—'}</strong></span>
+      </div>`
+    ).join('');
+
+    const spfRows = rec.spfResults.map(s =>
+      `<div class="ar-row">
+        <span class="ar-key">spf</span>
+        <span class="ar-val ${s.result}">${s.domain}${s.scope ? ' (' + s.scope + ')' : ''} · <strong>${s.result || '—'}</strong></span>
+      </div>`
+    ).join('');
+
+    const policyRow = rec.policyP
+      ? `<div class="ar-row"><span class="ar-key">policy</span><span class="ar-val">p=${rec.policyP}  adkim=${rec.policyDkim||'r'}  aspf=${rec.policySpf||'r'}</span></div>`
+      : '';
+
+    card.innerHTML = `
+      <div class="failure-header">
+        <span class="badge badge-muted" style="font-family:var(--font)">${rec.ip}</span>
+        <span>${rec.reporter}</span>
+        <span class="badge badge-muted">${rec.dateBegin}</span>
+        <span class="badge badge-blue">${rec.count.toLocaleString()} msg${rec.count !== 1 ? 's' : ''}</span>
+        ${statusBadge(rec.dkim)} DKIM
+        ${statusBadge(rec.spf)} SPF
+        ${dispositionBadge(rec.disposition)}
+      </div>
+      <div class="auth-results">
+        ${dkimRows || '<div class="ar-row"><span class="ar-key">dkim</span><span class="ar-val" style="color:var(--text-dim)">no results</span></div>'}
+        ${spfRows  || '<div class="ar-row"><span class="ar-key">spf</span><span class="ar-val" style="color:var(--text-dim)">no results</span></div>'}
+        ${policyRow}
+        <div class="ar-row"><span class="ar-key">disposition</span><span class="ar-val ${rec.disposition !== 'none' ? 'fail' : ''}">${rec.disposition}</span></div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// ─── Event wiring ─────────────────────────────────────────────────────────────
+document.getElementById('parse-btn').addEventListener('click', parseAll);
+
+document.getElementById('clear-btn').addEventListener('click', () => {
+  pendingFiles = [];
+  allRecords   = [];
+  renderFileList();
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('file-list').innerHTML = '';
+});
+
+// Drop zone
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') document.getElementById('file-input').click();
+});
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', async e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  await ingestFiles([...e.dataTransfer.files]);
+});
+
+document.getElementById('file-input').addEventListener('change', async e => {
+  await ingestFiles([...e.target.files]);
+  e.target.value = '';
+});
+
+// Table sort
+document.querySelectorAll('#records-table th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortCol = col;
+      sortDir = 'asc';
+    }
+    currentPage = 1;
+    renderTable();
+  });
+});
+
+// Filters
+document.getElementById('search-input').addEventListener('input',   () => { currentPage = 1; renderTable(); });
+document.getElementById('filter-result').addEventListener('change', () => { currentPage = 1; renderTable(); });
+document.getElementById('filter-reporter').addEventListener('change', () => { currentPage = 1; renderTable(); });
+</script>
+</body>
+</html>
